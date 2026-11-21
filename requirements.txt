@@ -1,0 +1,4 @@
+fpdf2==2.8.2
+qrcode==8.2
+pillow>=10.0.0
+streamlit>=1.30.0
