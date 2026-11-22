@@ -39,7 +39,7 @@ def format_pix_field(id_str: str, val_str: str) -> str:
 
 def gerar_payload_pix_oficial(
     chave: str,
-    nome_beneficiario: str = "STTILLOBABY",
+    nome_beneficiario: str = "Sebastião Carlos Pinto Da Silva",
     cidade: str = "SAO PAULO",
     valor: float = 0.0,
     txid: str = "***",
