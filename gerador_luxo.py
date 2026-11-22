@@ -7,6 +7,7 @@ QR Code Oficial do Banco Central (EMVCo Pix Copia e Cola) que abre direto no app
 import os
 import re
 import tempfile
+import unicodedata
 from datetime import datetime
 
 import qrcode
@@ -50,18 +51,28 @@ def gerar_payload_pix_oficial(
     """
     chave_limpa = str(chave).strip()
     nums = re.sub(r"\D", "", chave_limpa)
-    if len(nums) in (10, 11) and "@" not in chave_limpa:
-        # Padrão Banco Central: chave Pix celular deve ter código internacional +55
+    if "@" in chave_limpa:
+        # Chave e-mail mantém como está
+        chave_limpa = chave_limpa.lower()
+    elif len(nums) == 11:
+        # Se for celular (ex: 11999998888), o Bacen exige +55.
+        # Mas se for CPF (11 dígitos), a chave Pix é apenas os 11 dígitos numéricos.
+        # Se começar com formato padrão de celular (ex: DDD + 9 dígitos), verifica se já tem +55:
+        if chave_limpa.startswith("+55"):
+            chave_limpa = f"+{nums}"
+        else:
+            # Em chaves padrão tipo telefone celular sem +55:
+            chave_limpa = f"+55{nums}"
+    elif len(nums) == 10:
+        # Celular ou fixo antigo com DDD
         if not chave_limpa.startswith("+55"):
             chave_limpa = f"+55{nums}"
         else:
             chave_limpa = f"+{nums}"
-    elif (
-        len(nums) == 14
-        or re.match(r"^\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}$", chave_limpa)
-        or re.match(r"^\d{3}\.\d{3}\.\d{3}-\d{2}$", chave_limpa)
-    ):  # CNPJ
+    elif len(nums) == 14:
+        # CNPJ: apenas números
         chave_limpa = nums
+    # Chave aleatória (EVP / UUID) mantém intacta
 
     # 00: Format Indicator
     p00 = format_pix_field("00", "01")
@@ -82,15 +93,23 @@ def gerar_payload_pix_oficial(
     # 58: Country Code
     p58 = format_pix_field("58", "BR")
     # 59: Merchant Name (máx 25)
-    nome_beneficiario_limpo = (
-        re.sub(r"[^A-Za-z0-9 ]", "", nome_beneficiario).strip().upper()[:25]
+    nome_norm = (
+        unicodedata.normalize("NFKD", str(nome_beneficiario))
+        .encode("ASCII", "ignore")
+        .decode("ASCII")
     )
+    nome_beneficiario_limpo = re.sub(r"[^A-Za-z0-9 ]", "", nome_norm).strip().upper()[:25]
     if not nome_beneficiario_limpo:
-        nome_beneficiario_limpo = "STTILLOBABY"
+        nome_beneficiario_limpo = "SEBASTIAO CARLOS"
     p59 = format_pix_field("59", nome_beneficiario_limpo)
 
     # 60: Merchant City (máx 15)
-    cidade_limpa = re.sub(r"[^A-Za-z0-9 ]", "", cidade).strip().upper()[:15]
+    cid_norm = (
+        unicodedata.normalize("NFKD", str(cidade))
+        .encode("ASCII", "ignore")
+        .decode("ASCII")
+    )
+    cidade_limpa = re.sub(r"[^A-Za-z0-9 ]", "", cid_norm).strip().upper()[:15]
     if not cidade_limpa:
         cidade_limpa = "SAO PAULO"
     p60 = format_pix_field("60", cidade_limpa)
@@ -284,14 +303,14 @@ def criar_pdf_bytes(
     pdf.set_text_color(100, 110, 125)
     pdf.cell(20, 5, "Status:")
     pdf.set_font("Helvetica", "B", 8)
-    
+
     # Cor dinâmica para o Status
     texto_status = limpar_texto(status_documento).upper()
     if "APROVADO" in texto_status:
-        pdf.set_text_color(27, 94, 32) # Verde elegante para aprovado
+        pdf.set_text_color(27, 94, 32)  # Verde elegante para aprovado
     else:
-        pdf.set_text_color(197, 160, 89) # Dourado nobre para aguardando / análise
-        
+        pdf.set_text_color(197, 160, 89)  # Dourado nobre para aguardando / análise
+
     pdf.cell(65, 5, texto_status[:30])
 
     pdf.set_xy(108, y_bloco_cli + 22)
@@ -409,7 +428,7 @@ def criar_pdf_bytes(
     # Gera a string oficial EMVCo BR Code (Padrão Banco Central do Brasil)
     payload_pix_brcode = gerar_payload_pix_oficial(
         chave=chave_pix_final,
-        nome_beneficiario="STTILLOBABY",
+        nome_beneficiario="Sebastião Carlos Pinto Da Silva",
         cidade="SAO PAULO",
         valor=valor_pix_embutido,
         txid=numero_os if numero_os else "***",
@@ -480,7 +499,7 @@ def criar_pdf_bytes(
     pdf.cell(
         largura_txt_box - 38,
         4.5,
-        f" {limpar_texto(chave_pix_final)} (STILLOBABY)",
+        f" {limpar_texto(chave_pix_final)} (Sebastião Carlos Pinto Da Silva)",
         ln=True,
     )
 
@@ -553,10 +572,10 @@ def criar_pdf_bytes(
     pdf.set_xy(17, y_pix_box + 1.5)
     pdf.set_font("Helvetica", "B", 7.5)
     pdf.set_text_color(10, 25, 47)
-    pdf.cell(90, 3.5, "CHAVE PIX DIRETA (FAVORECIDO: STILLOBABY):")
+    pdf.cell(95, 3.5, "CHAVE PIX DIRETA (FAVORECIDO: SEBASTIAO CARLOS PINTO DA SILVA):")
     pdf.set_font("Helvetica", "B", 8)
     pdf.set_text_color(27, 94, 32)
-    pdf.cell(85, 3.5, f"{limpar_texto(chave_pix_final)}", align="R", ln=True)
+    pdf.cell(80, 3.5, f"{limpar_texto(chave_pix_final)}", align="R", ln=True)
 
     # Linha divisória fina interna
     pdf.set_draw_color(225, 230, 240)
