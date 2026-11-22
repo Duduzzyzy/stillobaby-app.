@@ -434,8 +434,12 @@ def criar_pdf_bytes(
         txid=numero_os if numero_os else "***",
     )
 
-    # Gera QR Code oficial escaneável por QUALQUER banco
-    qr = qrcode.QRCode(box_size=5, border=1)
+    # Gera QR Code oficial escaneável por QUALQUER banco em alta resolução
+    qr = qrcode.QRCode(
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=12,
+        border=2,
+    )
     qr.add_data(payload_pix_brcode)
     qr.make(fit=True)
     img_qr = qr.make_image(fill_color="black", back_color="white")
