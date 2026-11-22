@@ -434,19 +434,16 @@ def criar_pdf_bytes(
         txid=numero_os if numero_os else "***",
     )
 
-    # Gera QR Code oficial escaneável por QUALQUER banco em alta resolução
+    # Gera matriz do QR Code oficial escaneável por QUALQUER banco
     qr = qrcode.QRCode(
         error_correction=qrcode.constants.ERROR_CORRECT_M,
-        box_size=12,
-        border=2,
+        box_size=1,
+        border=0,
     )
     qr.add_data(payload_pix_brcode)
     qr.make(fit=True)
-    img_qr = qr.make_image(fill_color="black", back_color="white")
-
-    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tf:
-        temp_qr_path = tf.name
-        img_qr.save(temp_qr_path)
+    qr_matrix = qr.get_matrix()
+    qr_modules_count = len(qr_matrix)
 
     largura_txt_box = 136
     altura_cond = 50
@@ -544,23 +541,35 @@ def criar_pdf_bytes(
         ln=True,
     )
 
-    # Box com QR Code Oficial
+    # Box com QR Code Oficial Vetorial (100% nítido, sem imagem bitmap / sem borrar)
     # Dimensões da caixinha: largura 38, altura 41
-    # Imagem QR: 30x30 posicionada em Y = y_cond + 7
-    # Texto do rótulo: posicionado em Y = y_cond + 38 (CLARAMENTE ABAIXO DO QR, NUNCA EM CIMA!)
     pdf.set_fill_color(255, 255, 255)
     pdf.set_draw_color(200, 210, 225)
+    pdf.set_line_width(0.4)
     pdf.rect(154, y_cond + 6, 38, 41, "DF")
-    pdf.image(temp_qr_path, x=158, y=y_cond + 7.5, w=30, h=30)
+
+    # Desenho vetorial de cada módulo do QR Code (zero borrão em qualquer zoom ou impressão)
+    qr_box_x, qr_box_y, qr_total_size = 158.0, y_cond + 7.5, 30.0
+    qr_border = 1
+    total_grid = qr_modules_count + 2 * qr_border
+    mod_size = qr_total_size / total_grid
+
+    pdf.set_fill_color(0, 0, 0)
+    for row_idx in range(qr_modules_count):
+        for col_idx in range(qr_modules_count):
+            if qr_matrix[row_idx][col_idx]:
+                pdf.rect(
+                    qr_box_x + (col_idx + qr_border) * mod_size,
+                    qr_box_y + (row_idx + qr_border) * mod_size,
+                    mod_size + 0.05,
+                    mod_size + 0.05,
+                    "F",
+                )
+
     pdf.set_xy(154, y_cond + 38.5)
     pdf.set_font("Helvetica", "B", 7)
     pdf.set_text_color(10, 25, 47)
     pdf.cell(38, 7, rotulo_pix_qr, align="C")
-
-    try:
-        os.remove(temp_qr_path)
-    except:
-        pass
 
     # -------------------------------------------------------------------------
     # 4. CHAVE PIX COPIA E COLA OFICIAL (EMVCo BR CODE) + CHAVE DIRETA
